@@ -446,12 +446,32 @@ document.getElementById('btnSave').onclick = saveSnapshot;
   }
 
   function renderQueue(ids){
-    const q = (el('traitQ').value||'').trim().toLowerCase();
-    const tail = computeTail(ids).filter(id=>filterMatchTraits(id, q));
-    setStatusQ(`Showing ${tail.length} (next first)`);
-    const htmlCards = tail.map((id,idx)=>mkCardQ(id, idx+1)).join('');
-    el('gridQ').innerHTML = htmlCards;
-  }
+  const q = (el('traitQ').value || '').trim().toLowerCase();
+
+  // Full tail (unfiltered)
+  const fullTail = computeTail(ids);
+
+  // Map: token ID -> original queue position in the tail
+  const posMap = new Map();
+  fullTail.forEach((id, idx) => {
+    posMap.set(String(id), idx + 1);  // Q# is 1-based
+  });
+
+  // Apply trait filter but keep original queue positions
+  const tail = fullTail.filter(id => filterMatchTraits(id, q));
+
+  setStatusQ(`Showing ${tail.length} (next first)`);
+
+  const htmlCards = tail
+    .map(id => {
+      const qPos = posMap.get(String(id)) || 0; // fallback just in case
+      return mkCardQ(id, qPos);
+    })
+    .join('');
+
+  el('gridQ').innerHTML = htmlCards;
+}
+
 
   async function fetchQueue(){
     try{
