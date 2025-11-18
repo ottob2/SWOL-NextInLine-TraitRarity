@@ -475,28 +475,41 @@ document.getElementById('btnSave').onclick = saveSnapshot;
   function stopAuto(){ if(queueTimer){ clearInterval(queueTimer); queueTimer=null; } }
 
   // Tab switching
-  function show(which){
-    const tabR = el('tabR'), tabQ = el('tabQ');
-    const panelQ = el('panelQ');
-// ---- Robust panel toggle -----------------------------------------------
-  // Instead of relying on a fragile index into .bar elements, we explicitly
-  // grab the FIRST control panel (Trait & Rarity header). That is the one
-  // containing the search inputs, and it's the one we want to hide whenever
-  // "Next in Line" is visible.
-  const controlsBar = document.querySelector('.bar'); // first header bar
-    if(which==='q'){
-      tabQ.classList.add('active'); tabR.classList.remove('active');
-      panelQ.classList.remove('hidden'); controlsBar.classList.add('hidden');
-      fetchQueue().then(startAuto);
-      el('liveDiag').textContent='Queue live';
-    }else{
-      tabR.classList.add('active'); tabQ.classList.remove('active');
-      panelQ.classList.add('hidden'); controlsBar.classList.remove('hidden');
-      stopAuto();
-      el('liveDiag').textContent='';
-      render(S.filterIds || S.sorted);
-    }
+function show(which){
+  const tabR = el('tabR'), tabQ = el('tabQ');
+  const panelQ = el('panelQ');
+
+  // First Trait & Rarity header bar (RPC + filters)
+  const controlsBar = document.querySelector('.bar');
+
+  // Bar that holds the Trait & Rarity grid
+  const traitsGridBar = document.querySelector('#grid').parentElement;
+
+  if (which === 'q') {
+    // Show "Next in Line"
+    tabQ.classList.add('active');
+    tabR.classList.remove('active');
+
+    panelQ.classList.remove('hidden');      // show queue panel
+    controlsBar.classList.add('hidden');    // hide Trait&Rarity header
+    traitsGridBar.classList.add('hidden');  // hide Trait&Rarity grid
+
+    fetchQueue().then(startAuto);
+    el('liveDiag').textContent = 'Queue live';
+  } else {
+    // Show "Trait & Rarity"
+    tabR.classList.add('active');
+    tabQ.classList.remove('active');
+
+    panelQ.classList.add('hidden');         // hide queue panel
+    controlsBar.classList.remove('hidden'); // show Trait&Rarity header
+    traitsGridBar.classList.remove('hidden'); // show Trait&Rarity grid
+
+    stopAuto();
+    el('liveDiag').textContent = '';
+    render(S.filterIds || S.sorted);
   }
+}
 
   // Bind
   el('tabQ').onclick = ()=>show('q');
