@@ -260,21 +260,39 @@ function toIpfs(u){
 }
 function toGateway(u){ let s=toIpfs(u); for(const f of GWS) s=f(s); return s; }
 
+// Map: token ID -> queue position in the current tail (1 = NEXT)
+let queuePos = {};
+
 function cardHtml(id){
-  const tk = (S.traits.tokens||{})[String(id)]||{};
-  const traits = tk.traits||[];
-  const img = toGateway(tk.image||'');
+  const tk = (S.traits.tokens||{})[String(id)] || {};
+  const traits = tk.traits || [];
+  const img = toGateway(tk.image || '');
   const is404 = !!(S.owners.owners404||{})[String(id)];
-  const rank = (S.sorted.indexOf(id)+1) || '—';
-  const traitList = traits.slice().map(([t,v])=>({t,v,c:(S.traits.traitCounts||{})[`${t}::${v}`]||1})).sort((a,b)=>a.c-b.c || a.t.localeCompare(b.t));
-  const rows = traitList.map(x=>`<div class="kv"><span>${x.t}: <b>${x.v}</b></span><span>${fmt(x.c)} pcs</span></div>`).join('');
+  const rank = (S.rank && S.rank[id]) || (S.sorted.indexOf(id)+1) || '—';
+
+  const traitList = traits.slice().map(([t,v])=>({
+    t,
+    v,
+    c: (S.traits.traitCounts||{})[`${t}::${v}`] || 1
+  })).sort((a,b)=>a.c-b.c || a.t.localeCompare(b.t));
+
+  const rows = traitList
+    .map(x=>`<div class="kv"><span>${x.t}: <b>${x.v}</b></span><span>${fmt(x.c)} pcs</span></div>`)
+    .join('');
+
+  // NEW: if this id is in the current LP tail, show its Q#
+  const qPos = (queuePos && queuePos[String(id)]) || null;
+  const qBadge = qPos ? `<div class="qpos">Q#${qPos}</div>` : '';
+
   return `<div class="card">
-    <div class="rank">Rank ${rank}</div>${(S.teaser||{})[String(id)]?`<div class="teaser"> ${(S.teaser||{})[String(id)]} </div>`:""}
-    <img class="img" loading="lazy" src="${img}" onclick="window.open(\'${img}\', \'_blank\')"  onerror="this.style.display='none'">
+    ${qBadge}
+    <div class="rank">Rank ${rank}</div>${(S.teaser||{})[String(id)] ? `<div class="teaser"> ${(S.teaser||{})[String(id)]} </div>` : ""}
+    <img class="img" loading="lazy" src="${img}" onclick="window.open('${img}', '_blank')" onerror="this.style.display='none'">
     <details class="traits"><summary>Trait details</summary>${rows}</details>
-    <div class="meta"><span>#${id}</span><span class="badge">${is404?'404':'721'}</span></div>
+    <div class="meta"><span>#${id}</span><span class="badge">${is404 ? '404' : '721'}</span></div>
   </div>`;
 }
+
 
 function render(ids){
   const list = ids ? ids.slice() : S.sorted.slice();
@@ -473,17 +491,26 @@ document.getElementById('btnSave').onclick = saveSnapshot;
 }
 
 
-  async function fetchQueue(){
-    try{
-      setStatusQ('Loading queue…');
-      const hex = await ethCall(el('addr404').value.trim(), SIG_list);
-      queueIds = decUintArr(hex);
-      renderQueue(queueIds);
-      setStatusQ('');
-    }catch(e){
-      setStatusQ('Error: '+(e.message||e));
-    }
+async function fetchQueue(){
+  try{
+    setStatusQ('Loading queue…');
+    const hex = await ethCall(el('addr404').value.trim(), SIG_list);
+    queueIds = decUintArr(hex);
+
+    // Build global map: token ID -> queue position in the current tail
+    const fullTail = computeTail(queueIds); // same tail you show in Next in Line
+    queuePos = {};
+    fullTail.forEach((id, idx) => {
+      queuePos[String(id)] = idx + 1; // 1 = NEXT
+    });
+
+    renderQueue(queueIds);
+    setStatusQ('');
+  }catch(e){
+    setStatusQ('Error: '+(e.message||e));
   }
+}
+
 
   function startAuto(){
     stopAuto();
