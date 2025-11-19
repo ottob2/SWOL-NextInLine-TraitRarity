@@ -66,6 +66,68 @@
 }
 
 
+
+.social-links{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-left:12px;
+}
+.icon-link{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:22px;
+  height:22px;
+  border-radius:999px;
+  border:1px solid var(--line);
+  text-decoration:none;
+  font-size:13px;
+  color:var(--muted);
+  background:rgba(0,0,0,0.25);
+}
+.icon-link:hover{
+  border-color:var(--accent);
+  color:var(--ink);
+}
+.icon-link-x{
+  color:var(--accent);
+  font-weight:600;
+}
+.buy-swol{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin-left:12px;
+  padding:5px 10px;
+  border-radius:999px;
+  background:#1b2635;
+  border:1px solid var(--line);
+  text-decoration:none;
+  font-size:12px;
+  color:var(--ink);
+  white-space:nowrap;
+}
+.buy-swol:hover{
+  background:#243249;
+  border-color:var(--accent);
+}
+.pharaoh-logo{
+  height:18px;
+  width:auto;
+  display:block;
+}
+
+
+.btn-advanced{
+  opacity:0.25;
+  pointer-events:none;
+}
+body.admin .btn-advanced{
+  opacity:1;
+  pointer-events:auto;
+}
+
 </style>
 <link rel="icon" type="image/png" sizes="32x32" href="SWOL_Favicon.png">
 </head>
@@ -75,15 +137,24 @@
 <!-- Community credit: aligned to .wrap, not viewport -->
   <div class="brand">
     <span>Community page by</span>
-    <img alt="otto.b" src="otto.b.png">
+    <a href="https://x.com/ottob_2" target="_blank" rel="noopener noreferrer" title="@ottob_2 on X"><img alt="otto.b" src="otto.b.png"></a>
     <!-- <img alt="otto.b" src="data:image/png;base64, ...your long base64..."> -->
   </div>
 
 
   
-  <div class="row" id="tabsRow" style="gap:8px;margin:6px 0 0 0">
+  <div class="row" id="tabsRow" style="gap:15px;margin:6px 0 0 0">
     <button id="tabQ" class="btnTab">Next in Line</button>
     <button id="tabR" class="btnTab active">Trait & Rarity</button>
+    <div class="social-links">
+      <a class="icon-link" href="https://swollyfe.com/" target="_blank" rel="noopener noreferrer" title="SWOLLYFE website">🌐</a>
+      <a class="icon-link icon-link-x" href="https://x.com/SwolLyfe" target="_blank" rel="noopener noreferrer" title="X (Twitter)">𝕏</a>
+      <a class="icon-link" href="https://discord.gg/qgEhj4D5" target="_blank" rel="noopener noreferrer" title="Discord">💬</a>
+    </div>
+    <a class="buy-swol" href="https://pharaoh.exchange/swap?to=0x245B532ad64c7FBfeEC9aa42f37291b183cEA91b" target="_blank" rel="noopener noreferrer">
+      <img src="Pharoah.png" alt="Pharaoh Exchange" class="pharaoh-logo">
+      <span>Buy SWOL on Pharaoh</span>
+    </a>
     <span id="liveDiag" class="pill muted right"></span>
   </div>
   <style>
@@ -110,9 +181,9 @@
       <button id="btnSearch" class="primary">Search</button>
       <button id="btnClear">Clear</button>
       <span id="count" class="pill muted">—</span>
-      <button id="btnUpdateOwners" style="margin-left:auto;">Update Owners</button>
-      <button id="btnFullMeta">Full refresh metadata</button>
-      <button id="btnSave">Save</button>
+      <button id="btnUpdateOwners" class="btn-advanced" style="margin-left:auto;">Update Owners</button>
+      <button id="btnFullMeta" class="btn-advanced">Full refresh metadata</button>
+      <button id="btnSave" class="btn-advanced">Save</button>
       
     </div>
       <div class="row" style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
@@ -154,6 +225,10 @@ const fmt = n => Number(n).toLocaleString('en-US');
 const nowIso = () => new Date().toISOString().replace('T',' ').slice(0,19);
 function encUint(n){ n=BigInt(n); let s=n.toString(16); if(s.length%2)s='0'+s; return '0x'+s.padStart(64,'0'); }
 function setStatus(m){ el('status').textContent = m || ''; }
+function setProgress(m){ try{ el('status').textContent = m || ''; }catch(e){} }
+function updateSaveBtn(){
+  console.log("Save button update (stub)");
+}
 function setDiag(){ const t = S.traits.tokens||{}; const c404=Object.keys(S.owners.owners404||{}).length; const c721=(Object.keys(S.owners.owners721||{}).length - c404); el('diag').textContent = `Tokens: ${fmt(Object.keys(t).length)} | 721: ${fmt(c721)} | 404: ${fmt(c404)} | ${nowIso()}`; }
 function updateCount(n){ el('count').textContent = `Showing: ${fmt(n)}`; }
 
@@ -262,6 +337,114 @@ function toGateway(u){ let s=toIpfs(u); for(const f of GWS) s=f(s); return s; }
 
 // Map: token ID -> queue position in the current tail (1 = NEXT)
 let queuePos = {};
+
+function decodeString(hex){
+  if(!hex || hex==='0x') return '';
+  const h = hex.startsWith('0x') ? hex.slice(2) : hex;
+  const len = parseInt(h.slice(64,128),16);
+  const data = h.slice(128,128+len*2);
+  let out = '';
+  for(let i=0;i<data.length;i+=2){
+    out += String.fromCharCode(parseInt(data.slice(i,i+2),16));
+  }
+  try{ return decodeURIComponent(out); }catch{ return out; }
+}
+function deriveCandidateUrls(uri, id){
+  const ipfsUri = toIpfs(uri);
+  const gw = GWS.map(g=>g(ipfsUri));
+  const out = [...gw];
+  try{
+    const u = new URL(gw[0]);
+    const path = u.pathname;
+    if (/\/\d+\.json$/i.test(path)) {
+      // fine
+    } else if (/\/\d+$/i.test(path)) {
+      out.unshift(u.origin + path + '.json');
+    } else if (/\/$/.test(path)) {
+      out.unshift(u.origin + path + id + '.json');
+    } else if (!/\.json$/i.test(path)) {
+      out.unshift(u.origin + path.replace(/\/?$/,'/') + id + '.json');
+    }
+  }catch(e){}
+  return Array.from(new Set(out));
+}
+async function fetchWithRetry(urls, opts={}, tries=6){
+  let attempt = 0;
+  while(attempt < tries){
+    const idx = attempt % urls.length;
+    const url = urls[idx];
+    try{
+      const r = await fetch(url,{...opts, cache:'no-store'});
+      if (r.ok) return r;
+    }catch(e){}
+    await new Promise(res=>setTimeout(res, 300*Math.pow(1.4,attempt)+Math.random()*200));
+    attempt++;
+  }
+  throw new Error('All gateway attempts failed');
+}
+
+// Full metadata rebuild via tokenURI
+async function buildMetadata(){
+  if (S.scanning) return;
+  S.scanning = true;
+  setStatus('Building metadata via tokenURI with retries…');
+  setProgress('Starting…');
+  const ADDR_721 = el('addr721').value.trim();
+  const max = parseInt(el('supply').value||'3333',10);
+  const tokens = {};
+  const Q = [];
+  for(let i=1;i<=max;i++) Q.push(i);
+  let done = 0;
+  const workers = Math.min(16, (navigator.hardwareConcurrency||8));
+  const tasks = [];
+  for(let w=0; w<workers; w++){
+    tasks.push((async()=>{
+      while(Q.length){
+        const id = Q.pop();
+        try{
+          const sel = '0xc87b56dd' + encUint(id).slice(2).padStart(64,'0'); // tokenURI(uint256)
+          const hex = await ethCall(ADDR_721, sel);
+          const uri = decodeString(hex);
+          const urls = deriveCandidateUrls(uri, id);
+          let meta = null;
+          for(let attempt=0; attempt<urls.length && !meta; attempt++){
+            try{
+              const r = await fetchWithRetry(urls, {}, 5);
+              meta = await r.json();
+            }catch(e){}
+          }
+          if (meta){
+            const img0 = meta.image || meta.image_url || '';
+            const traitsRaw = Array.isArray(meta.attributes)
+              ? meta.attributes
+              : (Array.isArray(meta.traits) ? meta.traits : []);
+            const traits = traitsRaw.map(a=>[
+              String(a.trait_type || a.type || '').trim(),
+              String(a.value || '').trim()
+            ]);
+            tokens[String(id)] = { image: toIpfs(img0), traits };
+          }
+        }catch(e){}
+        done++;
+        if (done % 20 === 0) setProgress(`Fetched ${done}/${max}`);
+      }
+    })());
+  }
+  await Promise.all(tasks);
+  // Store and recompute rarity / ranks
+  S.traits = S.traits || {};
+  S.traits.tokens = tokens;
+  S.traits.lastUpdate = nowIso();
+  computeRarity();
+  setDiag();
+  el('embeddedTraits').textContent = JSON.stringify(S.traits);
+  setProgress('');
+  setStatus('Metadata built.');
+  updateSaveBtn();
+  render();
+  S.scanning = false;
+}
+
 
 function cardHtml(id){
   const tk = (S.traits.tokens||{})[String(id)] || {};
@@ -392,7 +575,8 @@ function saveSnapshot(){
 document.getElementById('btnSearch').onclick = search;
 document.getElementById('btnClear').onclick = clearSearch;
 document.getElementById('btnUpdateOwners').onclick = ()=>updateOwnersDelta().catch(e=>setStatus('Owners failed: '+(e.message||e)));
-document.getElementById('btnFullMeta').onclick = ()=>alert('Full metadata refresh will be added here (kept minimal for this cut).');
+document.getElementById('btnFullMeta').onclick = ()=>buildMetadata().catch(e=>setStatus('Metadata failed: '+(e.message||e)));
+
 document.getElementById('btnSave').onclick = saveSnapshot;
 
 // Initial render
@@ -579,6 +763,14 @@ function show(which){
 
   // Expose show for initial state (keep default 'r')
   window._swolShow = show;
+
+  // Toggle admin mode with Ctrl+Alt+A to enable advanced buttons (Update Owners / Full refresh / Save)
+  document.addEventListener('keydown', (e)=>{
+    if(e.ctrlKey && e.altKey && (e.key === 'a' || e.key === 'A')){
+      document.body.classList.toggle('admin');
+    }
+  });
+
   show('q');
 })();</script>
 </body>
